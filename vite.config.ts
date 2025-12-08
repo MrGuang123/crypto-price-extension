@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { resolve } from "node:path";
 import react from "@vitejs/plugin-react-swc";
 
 // https://vite.dev/config/
@@ -6,6 +7,7 @@ export default defineConfig({
   base: "./",
   build: {
     outDir: "dist",
+    assetsDir: ".",
     rollupOptions: {
       output: {
         entryFileNames: "[name].js",
@@ -13,7 +15,7 @@ export default defineConfig({
         assetFileNames: "[name].[ext]",
       },
       input: {
-        main: new URL("index.html", import.meta.url).pathname,
+        main: resolve(__dirname, "index.html"),
       },
     },
   },

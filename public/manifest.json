@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Crypto Price Extension",
+  "name": "Crypto Price Watcher",
   "version": "0.1.0",
+  "description": "Quickly track and get notified about crypto prices in your browser.",
   "action": {
     "default_popup": "index.html"
   },
-  "permissions": []
+  "permissions": ["storage", "notifications"],
+  "host_permissions": [
+    "https://api.coingecko.com/*",
+    "https://api.coinpaprika.com/*"
+  ]
 }
