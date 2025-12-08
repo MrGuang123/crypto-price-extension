@@ -1,3 +1,3 @@
-// 类型定义占位符
-export {};
+export type { AlertRule, AlertType } from "../alerts/alertManager";
+export type { Settings, RefreshMode } from "../hooks/useSettings";
 

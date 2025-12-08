@@ -16,6 +16,7 @@ export default defineConfig({
       },
       input: {
         main: resolve(__dirname, "index.html"),
+        background: resolve(__dirname, "src/background.ts"),
       },
     },
   },

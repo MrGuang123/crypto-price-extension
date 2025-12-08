@@ -3,12 +3,28 @@
   "name": "Crypto Price Watcher",
   "version": "0.1.0",
   "description": "Quickly track and get notified about crypto prices in your browser.",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
     "default_popup": "index.html"
   },
-  "permissions": ["storage", "notifications"],
+  "permissions": ["storage", "notifications", "alarms"],
   "host_permissions": [
     "https://api.coingecko.com/*",
     "https://api.coinpaprika.com/*"
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
 }
