@@ -22,6 +22,12 @@ import {
   getAlertRules,
   type AlertRule,
 } from "./alerts/alertManager";
+import {
+  fetchHotCoins,
+  fetchAllCoinsPage,
+  searchCoins,
+  type CoinDirectoryItem,
+} from "./api/coinDirectory";
 
 type PriceState = {
   loading: boolean;
@@ -97,9 +103,35 @@ function App() {
   const [activeCoin, setActiveCoin] =
     useState<CoinInfo | null>(null);
   const [tab, setTab] = useState<
-    "watch" | "all" | "settings"
+    "watch" | "all" | "hot" | "settings"
   >("watch");
   const [input, setInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTrigger, setSearchTrigger] = useState("");
+  const [searchResults, setSearchResults] = useState<
+    CoinDirectoryItem[]
+  >([]);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<
+    string | null
+  >(null);
+  const [allList, setAllList] = useState<
+    CoinDirectoryItem[]
+  >([]);
+  const [allPage, setAllPage] = useState(1);
+  const [allLoading, setAllLoading] = useState(false);
+  const [allError, setAllError] = useState<string | null>(
+    null
+  );
+  const [hotList, setHotList] = useState<
+    CoinDirectoryItem[]
+  >([]);
+  const [hotPage, setHotPage] = useState(1);
+  const [hotLoading, setHotLoading] = useState(false);
+  const [hotError, setHotError] = useState<string | null>(
+    null
+  );
 
   const loadAlertRules = useCallback(async () => {
     const rules = await getAlertRules();
@@ -242,6 +274,62 @@ function App() {
     ]);
   };
 
+  // --- Search & Hot lists ---
+  useEffect(() => {
+    if (tab !== "all") return;
+    if (!searchTrigger.trim()) {
+      const t = setTimeout(() => {
+        setSearchResults([]);
+        setSearchPage(1);
+        // 默认展示 allList
+      }, 0);
+      return () => clearTimeout(t);
+    }
+    const id = setTimeout(async () => {
+      setSearchLoading(true);
+      setSearchError(null);
+      const res = await searchCoins(searchTrigger);
+      setSearchResults(res);
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [searchTrigger, tab]);
+
+  useEffect(() => {
+    if (tab !== "all") return;
+    const loadAll = async () => {
+      setAllLoading(true);
+      setAllError(null);
+      const res = await fetchAllCoinsPage(allPage, 10);
+      setAllList(res);
+      setAllLoading(false);
+      if (!res.length) setAllError("未获取到列表");
+    };
+    void loadAll();
+  }, [allPage, tab]);
+
+  useEffect(() => {
+    if (tab !== "hot") return;
+    const loadHot = async () => {
+      setHotLoading(true);
+      setHotError(null);
+      const res = await fetchHotCoins(hotPage, 10);
+      setHotList(res);
+      setHotLoading(false);
+      if (!res.length) setHotError("未获取到热门列表");
+    };
+    void loadHot();
+  }, [hotPage, tab]);
+
+  const pageSize = 10;
+  const searchTotalPages = Math.max(
+    1,
+    Math.ceil(searchResults.length / pageSize)
+  );
+  const searchPageItems = searchResults.slice(
+    (searchPage - 1) * pageSize,
+    searchPage * pageSize
+  );
   return (
     <div className="popup">
       <header className="header">
@@ -274,6 +362,14 @@ function App() {
           onClick={() => setTab("all")}
         >
           All Coins
+        </button>
+        <button
+          className={`tab-btn ${
+            tab === "hot" ? "active" : ""
+          }`}
+          onClick={() => setTab("hot")}
+        >
+          Hot
         </button>
         <button
           className={`tab-btn ${
@@ -399,28 +495,269 @@ function App() {
       {tab === "all" && (
         <div className="card">
           <p className="subtitle">
-            输入想添加的币种 ID 或 symbol，点击添加
+            搜索币种（模糊匹配 id/symbol/name），分页每页 10
+            条
           </p>
           <div className="add-bar">
             <input
               className="add-input"
-              placeholder="如 bitcoin / eth / sol"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              placeholder="如 bitcoin / eth / sol（回车或按钮搜索）"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+              }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd();
+                if (e.key === "Enter") {
+                  setSearchPage(1);
+                  setSearchTrigger(searchTerm.trim());
+                }
               }}
             />
             <button
               className="primary-btn"
-              onClick={handleAdd}
+              onClick={() => {
+                setSearchPage(1);
+                setSearchTrigger(searchTerm.trim());
+              }}
             >
-              添加
+              搜索
             </button>
           </div>
-          <p className="note">
-            后续可接入全量列表/搜索 API。
+          <div className="list-scroll">
+            {searchTrigger.trim() ? (
+              searchLoading ? (
+                <div className="empty">搜索中...</div>
+              ) : searchError ? (
+                <div className="empty">{searchError}</div>
+              ) : searchPageItems.length === 0 ? (
+                <div className="empty">未找到结果</div>
+              ) : (
+                searchPageItems.map((item) => (
+                  <div className="row" key={item.id}>
+                    <div className="info">
+                      <div className="name">
+                        {item.name}{" "}
+                        <span className="symbol">
+                          {item.symbol}
+                        </span>
+                      </div>
+                      <div className="meta">
+                        <span className="price">
+                          {formatPrice(
+                            item.priceUsd,
+                            settings.currency
+                          )}
+                        </span>
+                        <span
+                          className={`change ${
+                            typeof item.change24h ===
+                            "number"
+                              ? item.change24h > 0
+                                ? "positive"
+                                : item.change24h < 0
+                                ? "negative"
+                                : ""
+                              : ""
+                          }`}
+                        >
+                          {formatChange(item.change24h)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="status">
+                      <button
+                        className="primary-btn"
+                        onClick={() => {
+                          setInput(item.id);
+                          handleAdd();
+                        }}
+                      >
+                        添加
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )
+            ) : allLoading ? (
+              <div className="empty">加载列表中...</div>
+            ) : allError ? (
+              <div className="empty">{allError}</div>
+            ) : allList.length === 0 ? (
+              <div className="empty">暂无数据</div>
+            ) : (
+              allList.map((item) => (
+                <div className="row" key={item.id}>
+                  <div className="info">
+                    <div className="name">
+                      {item.name}{" "}
+                      <span className="symbol">
+                        {item.symbol}
+                      </span>
+                    </div>
+                    <div className="meta">
+                      <span className="price">
+                        {formatPrice(
+                          item.priceUsd,
+                          settings.currency
+                        )}
+                      </span>
+                      <span
+                        className={`change ${
+                          typeof item.change24h === "number"
+                            ? item.change24h > 0
+                              ? "positive"
+                              : item.change24h < 0
+                              ? "negative"
+                              : ""
+                            : ""
+                        }`}
+                      >
+                        {formatChange(item.change24h)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="status">
+                    <button
+                      className="primary-btn"
+                      onClick={() => {
+                        setInput(item.id);
+                        handleAdd();
+                      }}
+                    >
+                      添加
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {searchTrigger.trim() ? (
+            <div className="pagination">
+              <button
+                className="text-btn"
+                onClick={() =>
+                  setSearchPage((p) => Math.max(1, p - 1))
+                }
+                disabled={searchPage === 1}
+              >
+                上一页
+              </button>
+              <span className="note">
+                {searchPage}/{searchTotalPages}
+              </span>
+              <button
+                className="text-btn"
+                onClick={() =>
+                  setSearchPage((p) =>
+                    Math.min(searchTotalPages, p + 1)
+                  )
+                }
+                disabled={searchPage === searchTotalPages}
+              >
+                下一页
+              </button>
+            </div>
+          ) : (
+            <div className="pagination">
+              <button
+                className="text-btn"
+                onClick={() =>
+                  setAllPage((p) => Math.max(1, p - 1))
+                }
+                disabled={allPage === 1}
+              >
+                上一页
+              </button>
+              <span className="note">第 {allPage} 页</span>
+              <button
+                className="text-btn"
+                onClick={() => setAllPage((p) => p + 1)}
+              >
+                下一页
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "hot" && (
+        <div className="card">
+          <p className="subtitle">
+            热门榜（前 70，10 条/页）
           </p>
+          <div className="list-scroll">
+            {hotLoading ? (
+              <div className="empty">加载热门中...</div>
+            ) : hotError ? (
+              <div className="empty">{hotError}</div>
+            ) : (
+              hotList.map((item) => (
+                <div className="row" key={item.id}>
+                  <div className="info">
+                    <div className="name">
+                      {item.name}{" "}
+                      <span className="symbol">
+                        {item.symbol}
+                      </span>
+                    </div>
+                    <div className="meta">
+                      <span className="price">
+                        {formatPrice(
+                          item.priceUsd,
+                          settings.currency
+                        )}
+                      </span>
+                      <span
+                        className={`change ${
+                          typeof item.change24h === "number"
+                            ? item.change24h > 0
+                              ? "positive"
+                              : item.change24h < 0
+                              ? "negative"
+                              : ""
+                            : ""
+                        }`}
+                      >
+                        {formatChange(item.change24h)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="status">
+                    <button
+                      className="primary-btn"
+                      onClick={() => {
+                        setInput(item.id);
+                        handleAdd();
+                      }}
+                    >
+                      添加
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="pagination">
+            <button
+              className="text-btn"
+              onClick={() =>
+                setHotPage((p) => Math.max(1, p - 1))
+              }
+              disabled={hotPage === 1}
+            >
+              上一页
+            </button>
+            <span className="note">{hotPage}/7</span>
+            <button
+              className="text-btn"
+              onClick={() =>
+                setHotPage((p) => Math.min(7, p + 1))
+              }
+              disabled={hotPage === 7}
+            >
+              下一页
+            </button>
+          </div>
         </div>
       )}
 
